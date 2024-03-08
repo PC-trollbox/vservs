@@ -1,0 +1,22 @@
+{
+    "listenPort": 3914,
+    "listenPortSecure": 3915,
+    "servers": {
+        "ducchat.localhost": "http://localhost:4598"
+    },
+    "keyPath": "/path/to/private.key",
+    "certPath": "/path/to/my.certificate",
+    "realIP": "CF-Connecting-IP",
+    "plugins": [
+        "./hostmatch_plugin_example.js"
+    ],
+    "appendRequestHeaders": {
+        "X-Served-Vservs": "6a35d8ae7d0b196833e8f0d3d2054609"
+    },
+    "appendBidirectionalHeaders": {
+        "X-Vservs-Instance": "127.0.0.1"
+    },
+    "appendResponseHeaders": {
+        "X-Vservs-Used": "yes"
+    }
+}
