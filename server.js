@@ -17,6 +17,9 @@ const https_serv = https.createServer({
 	cert: conf.certPath ? fs.readFileSync(conf.certPath) : null
 }, handler);
 
+serv.on("upgrade", upgradeHandler);
+https_serv.on("upgrade", upgradeHandler);
+
 async function handler(req, res) {
 	if (req.headers["x-loop-prevent"] == "vservs") return res.writeHeader(502).end("vservs found a loop in the server configuration." + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration"));
 	let conf = loadConf();
@@ -55,11 +58,6 @@ async function handler(req, res) {
 				clientRes.destroy();
 			});
 		});
-		clientReq.on("upgrade", function(cres, sock) {
-			res.writeHead(cres.statusCode, { ...cres.headers, ...conf.appendResponseHeaders, ...conf.appendBidirectionalHeaders });
-			cres.pipe(res);
-			sock.pipe(cres);
-		})
 		req.pipe(clientReq);
 		clientReq.on("error", function(e) {
 			res.writeHeader(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration and troubleshoot the server; problem in the request part"));
@@ -69,6 +67,57 @@ async function handler(req, res) {
 	} catch (e) {
 		res.writeHeader(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration; the URL must be incorrect"));
 		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+	}
+}
+
+async function upgradeHandler(req, socket, head) {
+	if (req.headers["x-loop-prevent"] == "vservs") return socket.end("vservs:loopDetectedError");
+	let conf = loadConf();
+	if (!req.headers) return socket.end("vservs:noHeadersError");
+	if (!conf.servers) return socket.end("vservs:noServersDefinedError");
+	if (!req.headers.host) return socket.end("vservs:noHostHeaderError");
+	let reqId = crypto.randomBytes(16).toString("hex");
+	let host = FindHostMatch(req.headers.host, conf.servers);
+	if (!host) for (let plugin in plugin_ns.hostmatch) {
+		try {
+			host = await plugin_ns.hostmatch[plugin].runHostMatch(req.headers.host, req);
+		} catch (e) {
+			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+			return socket.end("vservs:pluginError:" + plugin + ":" + reqId);	
+		}
+		if (host) break;
+	}
+	if (!host) return socket.end("vservs:noServerDefinedError");
+	let modifiedHeaders = req.headers;
+	modifiedHeaders = { ...modifiedHeaders, ...conf.appendRequestHeaders, ...conf.appendBidirectionalHeaders };
+	modifiedHeaders["X-Loop-Prevent"] = "vservs";
+	modifiedHeaders[conf.realIP || "X-Real-IP"] = req.socket.remoteAddress;
+	modifiedHeaders["X-Forwarded-Proto"] = (req.socket.encrypted ? "https" : "http");
+	try {
+		let clientReq = (host.startsWith("http:") ? http : https).request(host + (host.endsWith("/") ? "" : "/") + req.url.replace("/", ""), {
+			headers: modifiedHeaders,
+			method: req.method
+		});
+		clientReq.on("upgrade", function(clientRes, serverSocket, serverHead) {
+			let allSentHeaders = { ...clientRes.headers, ...conf.appendResponseHeaders, ...conf.appendBidirectionalHeaders };
+			socket.write("HTTP/" + clientRes.httpVersion + " " + clientRes.statusCode + " " + clientRes.statusMessage + "\r\n" +
+				Object.keys(allSentHeaders).map(function(key) {
+					return key + ": " + allSentHeaders[key];
+				}).join("\r\n") + "\r\n\r\n");
+			serverSocket.write(head);
+			serverSocket.pipe(socket);
+			socket.write(serverHead);
+			socket.pipe(serverSocket);
+		});
+		req.pipe(clientReq);
+		clientReq.on("error", function(e) {
+			socket.end("vservs:connectionError:" + reqId);
+			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+			clientReq.destroy();
+		});
+	} catch (e) {
+		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+		socket.end("vservs:connectionError:" + reqId);
 	}
 }
 
