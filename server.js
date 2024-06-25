@@ -68,6 +68,7 @@ async function handler(req, res) {
 		res.writeHeader(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration; the URL must be incorrect"));
 		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
 	}
+	req.on("error", console.error);
 }
 
 async function upgradeHandler(req, socket, head) {
@@ -119,6 +120,7 @@ async function upgradeHandler(req, socket, head) {
 		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
 		socket.end("vservs:connectionError:" + reqId);
 	}
+	req.on("error", console.error);
 }
 
 const listenerLog = (secure) => () => console.log("[", new Date(), "]", "Listening for HTTP" + (secure ? "S" : "") + " started", (secure ? https_serv : serv).address());
