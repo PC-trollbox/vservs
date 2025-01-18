@@ -69,6 +69,7 @@ async function handler(req, res) {
 		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
 	}
 	req.on("error", console.error);
+	res.on("error", console.error);
 }
 
 async function upgradeHandler(req, socket, head) {
@@ -121,7 +122,13 @@ async function upgradeHandler(req, socket, head) {
 		socket.end("vservs:connectionError:" + reqId);
 	}
 	req.on("error", console.error);
+	socket.on("error", console.error);
 }
+serv.on("error", console.error);
+serv.on("clientError", console.error);
+https_serv.on("error", console.error);
+https_serv.on("clientError", console.error);
+https_serv.on("tlsClientError", console.error);
 
 const listenerLog = (secure) => () => console.log("[", new Date(), "]", "Listening for HTTP" + (secure ? "S" : "") + " started", (secure ? https_serv : serv).address());
 
