@@ -110,8 +110,25 @@ async function upgradeHandler(req, socket, head) {
 			serverSocket.pipe(socket);
 			socket.write(serverHead);
 			socket.pipe(serverSocket);
+			clientRes.on("error", function(e) {
+				socket.end("vservs:connectionError:" + reqId);
+				console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+				clientReq.destroy();
+				clientRes.destroy();
+			});
+			serverSocket.on("error", function(e) {
+				socket.end("vservs:connectionError:" + reqId);
+				console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+				clientReq.destroy();
+				clientRes.destroy();
+			});
 		});
 		req.pipe(clientReq);
+		socket.on("error", function(e) {
+			socket.end("vservs:connectionError:" + reqId);
+			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
+			clientReq.destroy();
+		});
 		clientReq.on("error", function(e) {
 			socket.end("vservs:connectionError:" + reqId);
 			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
