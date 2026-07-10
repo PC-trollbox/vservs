@@ -21,11 +21,11 @@ serv.on("upgrade", upgradeHandler);
 https_serv.on("upgrade", upgradeHandler);
 
 async function handler(req, res) {
-	if (req.headers["x-loop-prevent"] == "vservs") return res.writeHeader(502).end("vservs found a loop in the server configuration." + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration"));
+	if (req.headers["x-loop-prevent"] == "vservs") return res.writeHead(502).end("vservs found a loop in the server configuration." + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration"));
 	let conf = loadConf();
-	if (!req.headers) return res.writeHeader(400).end("The request does not contain any headers." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software creates HTTP headers"));
-	if (!conf.servers) return res.writeHeader(500).end("No servers configured on the vservs server you're attempting to access." + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "create a proxying configuration"));
-	if (!req.headers.host) return res.writeHeader(400).end("The request does not have a Host header." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software transfers the Host header"));
+	if (!req.headers) return res.writeHead(400).end("The request does not contain any headers." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software creates HTTP headers"));
+	if (!conf.servers) return res.writeHead(500).end("No servers configured on the vservs server you're attempting to access." + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "create a proxying configuration"));
+	if (!req.headers.host) return res.writeHead(400).end("The request does not have a Host header." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software transfers the Host header"));
 	let reqId = crypto.randomBytes(16).toString("hex");
 	let ath = { "X-Request-Id": reqId }; // Append to Headers; specifically about the request ID
 	let host = FindHostMatch(req.headers.host, conf.servers);
@@ -34,11 +34,11 @@ async function handler(req, res) {
 			host = await plugin_ns.hostmatch[plugin].runHostMatch(req.headers.host, req);
 		} catch (e) {
 			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
-			return res.writeHeader(500, ath).end("Failed to run plugin named " + plugin + "\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration and troubleshoot the server; problem in the response part"));	
+			return res.writeHead(500, ath).end("Failed to run plugin named " + plugin + "\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration and troubleshoot the server; problem in the response part"));	
 		}
 		if (host) break;
 	}
-	if (!host) return res.writeHeader(404).end("The specified hostname was not defined." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software transfers the Host header correctly"));
+	if (!host) return res.writeHead(404).end("The specified hostname was not defined." + vservReportMsg.replace("%s", manuf).replace("%s", manuf).replace("%s", "check if your software transfers the Host header correctly"));
 	let modifiedHeaders = req.headers;
 	modifiedHeaders = { ...modifiedHeaders, ...conf.appendRequestHeaders, ...conf.appendBidirectionalHeaders };
 	modifiedHeaders["X-Loop-Prevent"] = "vservs";
@@ -60,12 +60,12 @@ async function handler(req, res) {
 		});
 		req.pipe(clientReq);
 		clientReq.on("error", function(e) {
-			res.writeHeader(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration and troubleshoot the server; problem in the request part"));
+			res.writeHead(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration and troubleshoot the server; problem in the request part"));
 			console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
 			clientReq.destroy();
 		});
 	} catch (e) {
-		res.writeHeader(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration; the URL must be incorrect"));
+		res.writeHead(502, ath).end("Failed to contact the server configured to answer this request.\nRequest ID: " + reqId + vservReportMsg.replace("%s", servadmin).replace("%s", servadmin).replace("%s", "check the proxying configuration; the URL must be incorrect"));
 		console.error("[", new Date(), "]", req.socket.remoteAddress, reqId, e);
 	}
 	req.on("error", console.error);
